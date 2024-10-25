@@ -1,0 +1,31 @@
+name: Publish Python Package
+
+on:
+  push:
+    branches:
+      - main  # Ensure this is the correct branch you push to
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3  # Updated version
+    - name: Set up Python
+      uses: actions/setup-python@v4  # Updated version
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools wheel
+
+    - name: Build package
+      run: |
+        python setup.py sdist bdist_wheel
+
+    - name: Publish package to PyPI
+      uses: pypa/gh-action-pypi-publish@v1.5.1  # Use the latest version
+      with:
+        password: ${{ secrets.PYPI_API_TOKEN }}
