@@ -11,7 +11,7 @@ with open('requirements.txt') as f:
 
 setup(
     name='julien-python-toolkit',
-    version='0.1.8',
+    version='0.1.9',
     packages=find_packages(),
     license='Custom Non-Commercial License',  # Reference your custom license
     install_requires=required,  # Use the list from requirements.txt
