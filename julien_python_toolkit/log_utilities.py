@@ -68,12 +68,12 @@ class Logger():
 
 	def set_stream_log_level(self, log_level):
 		
-		for handler in logger.handlers:
+		for handler in self._logger.handlers:
 			if isinstance(handler, logging.StreamHandler) and stream_log_level is not None:
 				handler.setLevel(stream_log_level)
 		
 	def set_file_log_level(self, log_level):
 		
-		for handler in logger.handlers:
+		for handler in self._logger.handlers:
 			if isinstance(handler, logging.RotatingFileHandler) and stream_log_level is not None:
 				handler.setLevel(stream_log_level)
