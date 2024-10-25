@@ -69,11 +69,30 @@ class Logger():
 	def set_stream_log_level(self, log_level):
 		
 		for handler in self._logger.handlers:
-			if isinstance(handler, logging.StreamHandler) and stream_log_level is not None:
-				handler.setLevel(stream_log_level)
+			if isinstance(handler, logging.StreamHandler) and log_level is not None:
+				handler.setLevel(log_level)
 		
 	def set_file_log_level(self, log_level):
 		
 		for handler in self._logger.handlers:
-			if isinstance(handler, logging.RotatingFileHandler) and stream_log_level is not None:
-				handler.setLevel(stream_log_level)
+			if isinstance(handler, logging.handlers.RotatingFileHandler) and log_level is not None:
+				handler.setLevel(log_level)
+
+
+if __name__ == '__main__':
+
+	# Step 1: Set stream log level high (WARN) and file log level low (DEBUG)
+	#       We should see only WARN message on stream but both WARN and DEBUG messages in file
+
+	logger = Logger("Test", "test.log", stream_log_level = WARNING, file_log_level = DEBUG)
+
+	logger.warn("This should be in steam & file.")
+	logger.debug("This should be in file only.")
+
+	# Step 2: Set stream log level low (INFO) and file log level high (ERROR)
+
+	logger.set_stream_log_level(INFO)
+	logger.set_file_log_level(ERROR)
+
+	logger.info("This should be in stream only.")
+	logger.error("This should be in steam & file.")
