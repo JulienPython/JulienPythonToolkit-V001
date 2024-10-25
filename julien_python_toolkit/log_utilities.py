@@ -17,6 +17,14 @@ ERROR = logging.ERROR
 
 class Logger():
 
+	# NOTE: For logging to a file, this class uses a RotatingFileHandler, which rotates the log files.
+	#		The logger first starts by writing to a ".log" file adding new entries to the bottom. Once
+	#		the file reaches a certain size (1MB in our case), it will move all the logs from the ".log"
+	#		file to a ".log.1" file, and then start writing new logs to the ".log" file. The next time
+	#		the ".log" file reaches 1MB, it will move all the logs from the ".log" file to the ".log.1"
+	#		file, and then move the logs from the ".log.1" file to the ".log.2" file, and so on. However
+	#		we only keep 5 log files, so once the ".log.5" file is full, it will delete the ".log.5" file.
+
 	def __init__(self, name, file_name, stream_log_level = WARNING, file_log_level = INFO):
 	
 		self._logger = self._set_logger(name, file_name, stream_log_level, file_log_level)
