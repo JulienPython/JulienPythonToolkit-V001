@@ -132,6 +132,25 @@ class GoogleServices():
         except Exception as error:
             raise Exception(f"Error initializing Google services: {error}")
 
+    @retry_if_network_error
+    def batch_update_spreadsheet(self, spreadsheet_id, body):
+
+        if self._sheet_service == None:
+            raise Exception("Spreadsheet service is not initialized. Please run the 'open' function.")
+
+        try:
+
+            response = self._sheet_service.spreadsheets().batchUpdate(
+                spreadsheetId=spreadsheet_id,
+                body=body
+            ).execute()
+
+            return response
+        
+        except HttpError as error:
+            error_content = f"HttpError from {self.batch_update_spreadsheet.__name__}: {error.content}".encode('utf-8')
+            raise HttpError(resp=error.resp, content=error_content) from error
+
     @retry_if_network_error        
     def write_csv_to_sheet(self, csv_data, spreadsheet_id, sheet_name):
 
@@ -172,6 +191,8 @@ class GoogleServices():
 
     @retry_if_network_error
     def write_data_to_sheet_batch_update(self, ranges, values, spreadsheet_id):
+
+        # TODO: Modify to use 'batch_update_spreadsheet' function to avoid code duplication.
 
         """
         Function to batch update values to google sheet.
@@ -253,6 +274,10 @@ class GoogleServices():
     @retry_if_network_error
     def get_sheet_names_from_sheet(self, spreadsheet_id):
 
+        logger.warning(f"Method '{self.get_sheet_names_from_sheet.__name__}' will be depreciated in a future version.")
+
+        # TODO: Use 'get_sheets_medatada_from_sheet' to get sheets metadata and then get sheets names, to avoid code duplication.
+
         if self._sheet_service is None:
             raise Exception("Spreadsheet service is not initialized. Please run the 'open' function.")
 
@@ -268,6 +293,24 @@ class GoogleServices():
         
         except HttpError as error:
             error_content = f"HttpError from {self.get_sheet_names_from_sheet.__name__}: {error.content}".encode('utf-8')
+            raise HttpError(resp=error.resp, content=error_content) from error
+
+    @retry_if_network_error
+    def get_sheets_medatada_from_sheet(self, spreadsheet_id):
+
+        if self._sheet_service is None:
+            raise Exception("Spreadsheet service is not initialized. Please run the 'open' function.")
+
+        try:
+            # Call the Sheets API to get the spreadsheet
+            spreadsheet = self._sheet_service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+            
+            # Extract the sheet names
+            sheets_metadata = spreadsheet.get('sheets', [])
+            return sheets_metadata
+                    
+        except HttpError as error:
+            error_content = f"HttpError from {self.get_sheets_medatada_from_sheet.__name__}: {error.content}".encode('utf-8')
             raise HttpError(resp=error.resp, content=error_content) from error
 
     def get_subfolders_in_folder(self, folder_id):
@@ -382,3 +425,98 @@ class GoogleServices():
         
         except Exception as error:
             raise Exception(f"Error uploading file to folder: {error}")
+        
+    # Non network functions.
+
+    def duplicate_sheet(self, spreadsheet_id, source_sheet_id, insert_index, new_sheet_name):
+
+        if not isinstance(insert_index, int):
+            raise Exception(f"Insert index '{insert_index}' is not an integer.")
+        
+        if not isinstance(new_sheet_name, str):
+            raise Exception(f"New sheet name '{new_sheet_name}' is not a string.")
+        
+        if len(new_sheet_name) > 50:
+            raise Exception(f"New sheet name '{new_sheet_name}' has {len(new_sheet_name)} characters, but max. is 50 characters.")
+
+        request_body = {
+            "requests": [
+                {
+                    "duplicateSheet": {
+                        "sourceSheetId": source_sheet_id,
+                        # Insert at the specified index
+                        "insertSheetIndex": insert_index,
+                        # New sheet name
+                        "newSheetName": new_sheet_name
+                    }
+                }
+            ]
+        }
+
+        return self.batch_update_spreadsheet(spreadsheet_id, request_body)
+
+    def delete_sheets_from_spreadsheet(self, spreadsheet_id, ids_of_sheets_to_delete):
+
+        if not isinstance(ids_of_sheets_to_delete, list):
+            raise Exception(f"Sheet ids '{ids_of_sheets_to_delete}' is not a list.")
+        
+        if len(ids_of_sheets_to_delete) == 0:
+            raise Exception(f"Sheet ids list '{ids_of_sheets_to_delete}' is empty.")
+        
+        requests = []
+        for sheet_id in ids_of_sheets_to_delete:
+            requests.append({
+                "deleteSheet": {
+                    "sheetId": sheet_id
+                }
+            })
+
+        request_body = {
+            "requests": requests
+        }
+
+        return self.batch_update_spreadsheet(spreadsheet_id, request_body)
+
+    def reorder_all_sheets_in_spreadsheet(self, spreadsheet_id, sheet_ids_in_new_order):
+
+        # Step 0: Initial checks.
+        if not isinstance(sheet_ids_in_new_order, list):
+            raise Exception(f"Sheet names '{sheet_ids_in_new_order}' is not a list.")
+        
+        if len(sheet_ids_in_new_order) == 0:
+            raise Exception(f"Sheet names list '{sheet_ids_in_new_order}' is empty.")
+        
+        # Step 1: Check that each sheet id is an integer.
+        for sheet_id in sheet_ids_in_new_order:
+            if not isinstance(sheet_id, int):
+                raise Exception(f"Sheet id '{sheet_id}' is not an integer.")
+        
+        # Step 2: Check that there are no duplicate sheet ids.
+        if len(sheet_ids_in_new_order) != len(set(sheet_ids_in_new_order)):
+            raise Exception(f"Sheet ids list '{sheet_ids_in_new_order}' contains duplicate sheet ids.")
+        
+        # Step 3: Get the original sheet ids.
+        sheet_metadata = self.get_sheets_medatada_from_sheet(spreadsheet_id)
+        original_sheet_ids = [sheet['properties']['sheetId'] for sheet in sheet_metadata]
+
+        # Step 4: Check that the set of original sheet ids and new sheet ids are the same.
+        if set(original_sheet_ids) != set(sheet_ids_in_new_order):
+            raise Exception(f"Original sheet ids '{original_sheet_ids}' and new sheet ids '{sheet_ids_in_new_order}' are not the same.")
+        
+        requests = []
+        for index, sheet_id in enumerate(sheet_ids_in_new_order):
+            requests.append({
+                "updateSheetProperties": {
+                    "properties": {
+                        "sheetId": sheet_id,
+                        "index": index
+                    },
+                    "fields": "index"
+                }
+            })
+
+        request_body = {
+            "requests": requests
+        }
+
+        return self.batch_update_spreadsheet(spreadsheet_id, request_body)
